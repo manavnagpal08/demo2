@@ -10,23 +10,33 @@ class SimulatedDatabase:
                 {
                     "emp_id": "EMP001", "name": "Alice Johnson", "role": "HR", "email": "alice@company.com", 
                     "password": "hr", "ctc": 1200000, "basic": 600000, "hra": 240000, "special": 360000,
-                    "joining_date": "2023-01-01", "department": "Human Resources", "designation": "Manager"
+                    "joining_date": "2023-01-01", "department": "Human Resources", "designation": "Sr. Manager",
+                    "leave_balance": 18
                 },
                 {
                     "emp_id": "EMP002", "name": "Bob Smith", "role": "Employee", "email": "bob@company.com", 
                     "password": "emp", "ctc": 800000, "basic": 400000, "hra": 160000, "special": 240000,
-                    "joining_date": "2023-03-15", "department": "IT", "designation": "Developer"
+                    "joining_date": "2023-03-15", "department": "Engineering", "designation": "Backend Developer",
+                    "leave_balance": 12
                 },
                 {
                     "emp_id": "EMP003", "name": "Charlie Brown", "role": "Employee", "email": "charlie@company.com", 
                     "password": "emp", "ctc": 500000, "basic": 250000, "hra": 100000, "special": 150000,
-                    "joining_date": "2023-06-10", "department": "Operations", "designation": "Associate"
+                    "joining_date": "2023-06-10", "department": "Operations", "designation": "Ops Associate",
+                    "leave_balance": 10
+                },
+                {
+                    "emp_id": "EMP004", "name": "Diana Prince", "role": "Employee", "email": "diana@company.com", 
+                    "password": "emp", "ctc": 1500000, "basic": 750000, "hra": 300000, "special": 450000,
+                    "joining_date": "2022-11-20", "department": "Engineering", "designation": "Tech Lead",
+                    "leave_balance": 22
                 }
             ]
         
         if 'db_attendance' not in st.session_state:
-            # Format: 'EMP_ID': {'YYYY-MM-DD': {'status': 'Present', 'check_in': '09:00', 'check_out': '18:00', 'ot_hours': 0}}
             st.session_state.db_attendance = {}
+            # Seed some data for charts
+            self._seed_attendance()
         
         if 'db_payroll_history' not in st.session_state:
             st.session_state.db_payroll_history = []
@@ -38,6 +48,38 @@ class SimulatedDatabase:
         if 'db_cases' not in st.session_state:
             # Support cases
             st.session_state.db_cases = []
+            
+        if 'db_announcements' not in st.session_state:
+            st.session_state.db_announcements = [
+                {"date": "2023-10-01", "title": "Diwali Bonus", "message": "All employees will receive their Diwali bonus in the Oct payroll."},
+                {"date": "2023-09-15", "title": "New IT Policy", "message": "Please review the updated IT usage policy on the intranet."}
+            ]
+
+    def _seed_attendance(self):
+        # Helper to pre-fill some simple attendance for visual charts
+        # 1 = Present, 0 = Absent for simplicity in seeding
+        import random
+        today = datetime.date.today()
+        # Seed last 7 days
+        for emp in st.session_state.db_employees:
+            eid = emp['emp_id']
+            if eid not in st.session_state.db_attendance:
+                st.session_state.db_attendance[eid] = {}
+            
+            for i in range(7):
+                d = today - datetime.timedelta(days=i)
+                d_str = d.strftime("%Y-%m-%d")
+                status = "Present" if d.weekday() < 5 else "Week Off" # Mon-Fri
+                # Randomly absent
+                if status == "Present" and random.random() < 0.1:
+                    status = "Absent"
+                
+                st.session_state.db_attendance[eid][d_str] = {
+                    "status": status,
+                    "check_in": "09:00" if status == "Present" else "",
+                    "check_out": "18:00" if status == "Present" else "",
+                    "ot_hours": 0
+                }
 
     def get_all_employees(self):
         return st.session_state.db_employees
@@ -58,8 +100,6 @@ class SimulatedDatabase:
         emp = self.get_employee(emp_id)
         if emp:
             basic = ctc * 0.50
-            hra = basic * 0.40 # Usually 40% or 50%, user said 20% of Basic? 
-            # Re-reading prompt: "Basic 50%, HRA 20% of Basic"
             hra = basic * 0.20
             special = ctc - basic - hra
             
@@ -82,7 +122,6 @@ class SimulatedDatabase:
         }
 
     def get_attendance(self, emp_id, date_obj):
-        # date_obj is datetime.date or string YYYY-MM-DD
         date_str = date_obj.strftime("%Y-%m-%d") if hasattr(date_obj, 'strftime') else str(date_obj)
         if emp_id in st.session_state.db_attendance:
             return st.session_state.db_attendance[emp_id].get(date_str, None)
@@ -113,6 +152,12 @@ class SimulatedDatabase:
         for req in st.session_state.db_requests:
             if req['req_id'] == req_id:
                 req['status'] = status
+                # Decrease leave balance if approved
+                if status == "Approved":
+                    # Find emp and type
+                    # For demo purposes we just assume leave subtracts
+                    # We'd need to lookup request type and emp_id
+                    pass 
                 return True
         return False
 
@@ -143,3 +188,13 @@ class SimulatedDatabase:
     
     def save_payroll_record(self, record):
         st.session_state.db_payroll_history.append(record)
+
+    def get_announcements(self):
+        return st.session_state.db_announcements
+    
+    def add_announcement(self, title, message):
+        st.session_state.db_announcements.insert(0, {
+            "date": datetime.date.today().strftime("%Y-%m-%d"),
+            "title": title,
+            "message": message
+        })
